@@ -8,6 +8,7 @@ int N; // число приемников
 real gamma;
 int nx, ny, nz; // число €чеек по коордам
 
+typedef real** Matrix;
 
 struct origin
 {
@@ -45,9 +46,65 @@ void ReadRec(real* RecX, real* RecY, int& nRecX, int& nRecY)
       RecX[xI] = xL + xI*xH;
 }
 
+void SLAEgen(int nX, int nY, int nZ, int nRecX, int nRecY, real* X, real *Y, real*Z, real*RecX,)
+{
+    int K = nX*nY*nZ;
+    int nRec = nRecX * nRecY;
+    Matrix A = new real * [K] {};
+
+    for (int i = 0; i < K; i++)
+        A[i] = new real[K]{};
+    
+    real sum;
+    for(int i = 0; i < K; i++)
+        for (int j = 0; j < K; j++)
+        {
+            sum = 0;
+            for (int iRec = 0; iRec < nRec; iRec++)
+            {
+                sum += Integrate(X[i], X[i + 1], real yL, real yR, real zL, real zR, function<real(real, real, real)> f);
+            }
+        }
+}
+
 void FindEdgesAndCenter()
 {
-   //эдгесы
+    real xL, xR;
+    int nX;
+    ifstream in("Mesh.txt");
+    in >> xL >> xR >> nX;
+    
+    real* xMesh = new real[nX]{};
+
+    real hX = (xR - xL) / nX;
+
+    for (real x = xL, int i=0; x < xR; x+=hX, i++)
+    {
+        xMesh[i] = x;
+    }
+
+    real yL, yR;
+    int nY;
+    in >> yL >> yR >> nY;
+    real* yMesh = new real[nY] {};
+
+    real hY = (yR - yL) / nY;
+
+    for (real y = yL, int i = 0; y < yR; y += hY, i++)
+    {
+        yMesh[i] = y;
+    }
+    real zL, zR;
+    int nZ;
+    in >> zL >> zR >> nZ;
+    real* zMesh = new real[nZ] {};
+
+    real hZ = (zR - zL) / nZ;
+
+    for (real z = zL, int i = 0; z < zR; z += hZ, i++)
+    {
+        zMesh[i] = z;
+    }
 
    
 

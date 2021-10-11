@@ -29,10 +29,13 @@
     <Text Include="SolutionB.txt">
       <Filter>Файлы ресурсов</Filter>
     </Text>
+    <Text Include="Mesh.txt">
+      <Filter>Файлы ресурсов</Filter>
+    </Text>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="main.h">
-      <Filter>Исходные файлы</Filter>
+      <Filter>Файлы заголовков</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

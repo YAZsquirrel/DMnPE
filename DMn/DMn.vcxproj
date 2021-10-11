@@ -142,6 +142,7 @@
     <ClCompile Include="main.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <Text Include="Mesh.txt" />
     <Text Include="Params.txt" />
     <Text Include="SolutionB.txt" />
     <Text Include="SolutionF.txt" />
