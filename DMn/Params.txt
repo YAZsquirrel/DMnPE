@@ -1,0 +1,6 @@
+-1000 1000 10
+0 0 0
+
+kray1x kray2x stepx
+kray1y kray2y stepy
+
