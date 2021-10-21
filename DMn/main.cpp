@@ -1,5 +1,6 @@
 #include "main.h"
 
+/*
 real* g;
 real* dg;
 real** A;
@@ -7,7 +8,7 @@ real* b;
 int N; // число приемников
 real gamma;
 int nx, ny, nz; // число ячеек по коордам
-
+*/
 typedef real** Matrix;
 typedef real* Vector;
 
@@ -16,44 +17,102 @@ struct origin
    real x[2], y[2], z[2];
 } Orig;
 
+void Syntetics(real* RecX, real* RecY, int nX, int nY, int nZ, int& nRecX, int& nRecY, real* X, real* Y, real* Z)
+{
+    ofstream in("RecData.txt");
+    
+    real mes, r[3], sumG = 0.0;
+    
+    in << nRecX * nRecY << endl;
+
+    auto G = [](real ro, real r, real coord, real mes) {return mes * ro / (4.0 * M_PI * r * r * r) * coord; };
+    
+    int i;
+    int i;
+    for (i = 0; i < nX && X[i] < figureCoordL; i++);
+
+    sumG = 0;
+    for (int ix = xL; ix < xR; ix++)
+    {
+        r[0] = X[ix] - RecX[recI];
+        for (int iy = yL; iy < yR; iy++)
+        {
+            r[1] = Y[iy] - RecY[recJ];
+            for (int iz = zL; iz < zR; iz++)
+            {
+                r[2] = Z[iz];
+                mes = (X[ix + 1] - X[ix]) * (Y[iy + 1] - Y[iy]) * (Z[iz + 1] - Z[iz]);
+                sumG += G(ro[iCell], sqrt(r[0] * r[0] + r[1] * r[1] + r[2] * r[2]), Z[iz], mes);
+            }
+        }
+    }
+    in << sumG << " ";
+
+
+    for (int recI = 0; recI < nRecX; recI++)
+    {
+        for (int recJ = 0; recJ < nRecY; recJ++)
+        {
+        }
+    }
+}
+
+int readSyntetics(real** G, int nRecX, int nRecY)
+{
+    int nG;
+    ifstream in("RecData.txt");
+    in >> nG;
+    if (nG != nRecX * nRecY)
+        return -1;
+    *G = new real[nG]{};
+
+    real* localG = *G;
+
+    for (int i = 0; i < nG; i++) in >> localG[i];
+
+}
+
 int main()
 {
+
    //reciever Recs;
    //cout << Integrate(-2, 3, 1, 2, 0, 2, [](real x, real y, real z) {return pow(x*y, 5.) + x*y*z*z*z; });
    return 0;
 }
 
-// Чтение координат приемников
-// Возвращает координаты по Х и по Y, а также количество координат по каждой из этих осей.
-void ReadRec(real* RecX, real* RecY, int& nRecX, int& nRecY)
+int WriteRecMesh(real** recCoord, real left, real right, real step)
 {
-   ifstream in("Params.txt");
+    int n = (int)((right - left) / step);
+    real* temp = *recCoord = new real[n]{};
 
-   real xL, xR, yL, yR, xH, yH;
+    for (int i = 0; i < n; i++) temp[i] = left + i * step;
 
-   in >> xL >> xR >> xH; // Вввод параметров (Левая граница оси, Правая граница оси, Шаг по оси)
-   in >> yL >> yR >> yH;
-
-   nRecX = (int)((xR - xL) / xH);
-   nRecY = (int)((yR - yL) / yH);
-
-   RecX = new real[nRecX]{};
-   RecY = new real[nRecY]{};
-
-   for (int yI = 0; yI < nRecY; yI++)
-      RecY[yI] = yL + yI * yH;
-
-   for (int xI = 0; xI < nRecX; xI++)
-      RecX[xI] = xL + xI * xH;
+    return n;
 }
 
-void SLAEgen(int nX, int nY, int nZ, int nRecX, int nRecY, real* X, real* Y, real* Z, real* RecX, real* RecY)
+// Чтение координат приемников
+// Возвращает координаты по Х и по Y, а также количество координат по каждой из этих осей.
+void ReadRec(real** recX, real** recY, int& nRecX, int& nRecY)
+{
+    ifstream in("Params.txt");
+
+    real xL, xR, yL, yR, xH, yH;
+
+    in >> xL >> xR >> xH; // Вввод параметров (Левая граница оси, Правая граница оси, Шаг по оси)
+    in >> yL >> yR >> yH;
+
+    nRecX = WriteRecMesh(recX, xL, xR, xH);
+    nRecY = WriteRecMesh(recY, yL, yR, yH);
+}
+
+void SLAEgen(int nX, int nY, int nZ, int nRecX, int nRecY, real* X, real* Y, real* Z, real* RecX, real* RecY, real *G)
 {
    int K = nX * nY * nZ;   // Количество ячеек
-   int nRec = nRecX * nRecY;   // Количество приемников
+   
    Matrix A = new real * [K] {};   // Глобальная матрица СЛАУ
    for (int i = 0; i < K; i++)
       A[i] = new real[K]{};
+   
    real* b = new real[K]{}; // Глобальная правая часть СЛАУ
 
    function<real(real, real, real, real*, int)> f = [](real xB, real yB, real zB, real* args, int argNum) // подынтегральная функция
@@ -66,7 +125,7 @@ void SLAEgen(int nX, int nY, int nZ, int nRecX, int nRecY, real* X, real* Y, rea
    real gq, gs;
    int iX, iY, iZ, jX, jY, jZ;
    int nXY = nX * nY;
-
+   
    for (int iRecX = 0; iRecX < nRecX; iRecX++)
    {
       RecCoords[0] = RecX[iRecX];
@@ -87,8 +146,8 @@ void SLAEgen(int nX, int nY, int nZ, int nRecX, int nRecY, real* X, real* Y, rea
                gs = Integrate(X[jX], X[jX + 1], Y[jY], Y[jY + 1], Z[jZ], Z[jZ + 1], f, RecCoords, 3);
                A[q][s] += gq * gs;
             }
-            b[q] += gq * g[q];
 
+            b[q] += gq * G[q];
          }
       }
    }
@@ -96,83 +155,56 @@ void SLAEgen(int nX, int nY, int nZ, int nRecX, int nRecY, real* X, real* Y, rea
    for (int q = 0; q < K; q++)
    {
       b[q] /= 4 * M_PI;
-      for (int s = 0; s < K; s++)
-      {
-         A[q][s] /= 4 * M_PI * 4 * M_PI;
-      }
+      for (int s = 0; s < K; s++)  A[q][s] /= 4 * M_PI * 4 * M_PI;
    }
 
 }
 
-void FindEdgesAndCenter()
+void ReadCoordAxis(real** coordAxis, real left, real right, int n)
 {
-   real xL, xR;
-   int nX;
+    real* axis = *coordAxis = new real[n]{};
+
+    real h = (left - right) / n;
+    int i = 0;
+    for (real coord = left; coord < right; coord += h, i++)  axis[i] = coord;
+    if (i == 0) cout << "Error 1: Left coord > right coord";
+}
+
+void ReadCoords(real**X, real** Y, real**Z, int& nX, int nY, int nZ)
+{
    ifstream in("Mesh.txt");
+
+   real xL, xR, yL, yR, zL, zR;
    in >> xL >> xR >> nX;
-
-   real* xMesh = new real[nX]{};
-
-   real hX = (xR - xL) / nX;
-   int i = 0;
-   for (real x = xL ; x < xR; x += hX, i++)
-   {
-      xMesh[i] = x;
-   }
-
-   real yL, yR;
-   int nY;
    in >> yL >> yR >> nY;
-   real* yMesh = new real[nY]{};
-
-   real hY = (yR - yL) / nY;
-
-   i = 0;
-   for (real y = yL; y < yR; y += hY, i++)
-   {
-      yMesh[i] = y;
-   }
-   real zL, zR;
-   int nZ;
    in >> zL >> zR >> nZ;
-   real* zMesh = new real[nZ]{};
 
-   real hZ = (zR - zL) / nZ;
-   i = 0;
-   for (real z = zL; z < zR; z += hZ, i++)
-   {
-      zMesh[i] = z;
-   }
-
-
-
+   ReadCoordAxis(X, xL, xR, nX);
+   ReadCoordAxis(Y, yL, yR, nY);
+   ReadCoordAxis(Z, zL, zR, nZ);
 }
 
 void SLAEsolve(double** M, int N, double* b, double* q)
 {
-   int i, j;
-
-   /*GAUSSE---------------------------------------*/
+   //GAUSSE
    double a;
-   int iK, jK;
-   for (i = 0; i < N; i++)
+   
+   for (int i = 0; i < N; i++)
    {
       a = M[i][i];
       if (a)
       {
-         for (j = i; j < N; j++) // Делим текущую строку на коэффициент
-         {
-            M[i][j] /= a;
-         }
+          // Делим текущую строку на коэффициент
+         for (int j = i; j < N; j++) M[i][j] /= a;
+
          b[i] /= a;
 
-         for (iK = i + 1; iK < N; iK++) // Вычитаем текущую строку из последующих
+         for (int iK = i + 1; iK < N; iK++) // Вычитаем текущую строку из последующих
          {
             a = M[iK][i];
-            for (jK = i + 1; jK < N; jK++)
-            {
-               M[iK][jK] -= a * M[iK][jK];
-            }
+
+            for (int jK = i + 1; jK < N; jK++)  M[iK][jK] -= a * M[iK][jK];
+
             b[iK] -= a * b[i];
          }
       }
@@ -180,23 +212,21 @@ void SLAEsolve(double** M, int N, double* b, double* q)
          exit(-1);
    }
 
-   for (i = N - 1; i > -1; i--)
+   for (int i = N - 1; i > -1; i--)
    {
-      for (j = N - 1; j > i; j--)
-         b[i] -= M[i][j] * q[j];
-
+      for (int j = N - 1; j > i; j--)  b[i] -= M[i][j] * q[j];
       q[i] = b[i] / M[i][i];
    }
 }
 
 real Integrate(real xL, real xR, real yL, real yR, real zL, real zR, function<real(real, real, real, real* args, int argNum)> f, real* args, int argNum)
 {
-   real result = 0.;
-   //const int segs = 5;
+   
+   const int nKnot = 5;
 
-   real xj[5] = { -sqrt(5. + 2. * (sqrt(10. / 7.))) / 3., -sqrt(5. - 2. * (sqrt(10. / 7.))) / 3. ,
+   real xj[nKnot] = { -sqrt(5. + 2. * (sqrt(10. / 7.))) / 3., -sqrt(5. - 2. * (sqrt(10. / 7.))) / 3.,
               0. , sqrt(5. - 2. * (sqrt(10. / 7.))) / 3. , sqrt(5. + 2. * (sqrt(10. / 7.))) / 3. };
-   real qj[5] = { (322. - 13. * sqrt(70.)) / 900., (322. + 13. * sqrt(70.)) / 900., 128. / 225.,
+   real qj[nKnot] = { (322. - 13. * sqrt(70.)) / 900., (322. + 13. * sqrt(70.)) / 900., 128. / 225.,
                   (322. + 13. * sqrt(70.)) / 900., (322. - 13. * sqrt(70.)) / 900. };
    real hX = (xR - xL) / 2.,
       hY = (yR - yL) / 2.,
@@ -205,10 +235,10 @@ real Integrate(real xL, real xR, real yL, real yR, real zL, real zR, function<re
       cY = (yR + yL) / 2.,
       cZ = (zR + zL) / 2.;
 
-
-   for (int i = 0; i < 5; i++)               // x
-      for (int j = 0; j < 5; j++)            // y 
-         for (int k = 0; k < 5; k++)         // z
+   real result = 0.;
+   for (int i = 0; i < nKnot; i++)               // x
+      for (int j = 0; j < nKnot; j++)            // y 
+         for (int k = 0; k < nKnot; k++)         // z
             result += qj[i] * qj[j] * qj[k] * (f(cX + xj[i] * hX, cY + xj[j] * hY, cZ + xj[k] * hZ, args, argNum));
 
    return (xR - xL) * (yR - yL) * (zR - zL) * result / 8.;
