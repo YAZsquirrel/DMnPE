@@ -143,10 +143,10 @@
     <ClCompile Include="main.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <Text Include="Body.txt" />
     <Text Include="Mesh.txt" />
     <Text Include="Params.txt" />
     <Text Include="RecData.txt" />
-    <Text Include="SolutionB.txt" />
     <Text Include="SolutionF.txt" />
   </ItemGroup>
   <ItemGroup>

@@ -1,119 +1,158 @@
 #include "main.h"
-
-/*
-real* g;
-real* dg;
-real** A;
-real* b;
-int N; // число приемников
-real gamma;
-int nx, ny, nz; // число ячеек по коордам
-*/
+#define OPTIM_SYNTETIC
 typedef real** Matrix;
-typedef real* Vector;
 
-struct origin
+struct recInfo	 // Структура данных приемников
 {
-   real x[2], y[2], z[2];
-} Orig;
+   real *RecX, *RecY;		// координаты приемников на поверхности (z = 0)
+   int nRecX, nRecY;		// колво приемников по осям
+};
 
-void Syntetics(real* RecX, real* RecY, int nX, int nY, int nZ, int& nRecX, int& nRecY, real* X, real* Y, real* Z)
+struct meshInfo // Структура данных сетки
 {
-    ofstream in("RecData.txt");
-    
-    real mes, r[3], sumG = 0.0;
-    
-    in << nRecX * nRecY << endl;
+   real *X, *Y, *Z;		// координаты узлов секти по осям
+   int nX, nY, nZ;	// количество узлов сетки по осям
+};
 
-    auto G = [](real ro, real r, real coord, real mes) {return mes * ro / (4.0 * M_PI * r * r * r) * coord; };
-    
-    int i;
-    int i;
-    for (i = 0; i < nX && X[i] < figureCoordL; i++);
+// Ввод координат тела аномалии (для синтетических данных)
+void BodyInput(real& xL, real& xR, real& yL, real& yR, real& zL, real& zR)	
+{
+   ifstream in("Body.txt");
 
-    sumG = 0;
-    for (int ix = xL; ix < xR; ix++)
-    {
-        r[0] = X[ix] - RecX[recI];
-        for (int iy = yL; iy < yR; iy++)
-        {
-            r[1] = Y[iy] - RecY[recJ];
-            for (int iz = zL; iz < zR; iz++)
+   in >> xL >> xR >> yL >> yR >> zL >> zR;
+
+   in.close();
+}
+
+// лол
+real ro(real x, real y, real z)
+{
+   return 1;
+}
+
+// каво-чиво
+int findIndCoord(real bodyCoord, real* X, int n)
+{
+   int i, iPrev = 0;
+   int iR = n - 1, iL = 0;
+
+   for (i = iR; (X[i] > bodyCoord || X[i - 1] < bodyCoord) && i != iPrev; i = (iL + iR) / 2)
+   {
+      iPrev = i;
+      (X[i] > bodyCoord ? iR : iL) = i;
+   }
+   if (X[i - 1] == bodyCoord) i--;
+
+   return i;
+}
+
+// Ввод синтетических данных для тестирования программы
+
+void Syntetics(meshInfo mesh, recInfo rec)
+{
+   real* RecX = rec.RecX, *RecY = rec.RecY;
+   int nRecX = rec.nRecX, nRecY = rec.nRecY;
+
+   real* X = mesh.X, *Y = mesh.Y, *Z = mesh.Z;
+   int nX = mesh.nX, nY = mesh.nY, nZ = mesh.nZ;
+
+   real xL, xR, yL, yR, zL, zR;
+   BodyInput(xL, xR, yL, yR, zL, zR);
+   
+   ofstream out("RecData.txt");
+   out << nRecX * nRecY << endl;
+   
+   
+   auto G = [](real ro, real r, real coord, real mes) {return mes * ro / (4.0 * M_PI * r * r * r) * coord; };
+
+   int ixL = findIndCoord(xL, X, nX);
+   int ixR = findIndCoord(xR, X, nX) - 1;
+   int iyL = findIndCoord(yL, Y, nX);
+   int iyR = findIndCoord(yR, Y, nX) - 1;
+   int izL = findIndCoord(zL, Z, nX);
+   int izR = findIndCoord(zR, Z, nX) - 1;
+   
+   real mes, rSqr[3]{}, sumG;
+
+   for (int recI = 0; recI < nRecX; recI++)
+   { 
+      for (int recJ = 0; recJ < nRecY; recJ++)
+      {
+         sumG = 0.;
+         for (int ix = ixL; ix < ixR; ix++)
+         {
+             rSqr[0] = (X[ix] - RecX[recI]) * (X[ix] - RecX[recI]);
+            for (int iy = iyL; iy < iyR; iy++)
             {
-                r[2] = Z[iz];
-                mes = (X[ix + 1] - X[ix]) * (Y[iy + 1] - Y[iy]) * (Z[iz + 1] - Z[iz]);
-                sumG += G(ro[iCell], sqrt(r[0] * r[0] + r[1] * r[1] + r[2] * r[2]), Z[iz], mes);
+                rSqr[1] = (Y[iy] - RecY[recJ]) * (Y[iy] - RecY[recJ]);
+               for (int iz = izL; iz < izR; iz++)
+               {
+                  rSqr[2] = Z[iz] * Z[iz];
+                  mes =  (X[ix + 1] - X[ix])*(Y[iy + 1] - Y[iy])*(Z[iz + 1] - Z[iz]);
+                  sumG += G(ro(X[ix], Y[iy], Z[iz]), sqrt(rSqr[0] + rSqr[1] + rSqr[2]), Z[iz], mes);
+               }
             }
-        }
-    }
-    in << sumG << " ";
-
-
-    for (int recI = 0; recI < nRecX; recI++)
-    {
-        for (int recJ = 0; recJ < nRecY; recJ++)
-        {
-        }
-    }
+         }
+         out << sumG << "\n";
+      }
+   }
 }
 
-int readSyntetics(real** G, int nRecX, int nRecY)
+void readSyntetics(string fileName, real** G)
 {
-    int nG;
-    ifstream in("RecData.txt");
-    in >> nG;
-    if (nG != nRecX * nRecY)
-        return -1;
-    *G = new real[nG]{};
+   ifstream in(fileName);
+   int nG;
+   in >> nG;
 
-    real* localG = *G;
+   real* localG =  *G = new real[nG]{};
 
-    for (int i = 0; i < nG; i++) in >> localG[i];
-
+   for (int i = 0; i < nG; i++) in >> localG[i];
 }
 
-int main()
+// Заполнение координат по осям в сетку
+void FillCoordAxis(real** coordAxis, real left, real right, int n)
 {
+   real* axis = *coordAxis = new real[n]{};
 
-   //reciever Recs;
-   //cout << Integrate(-2, 3, 1, 2, 0, 2, [](real x, real y, real z) {return pow(x*y, 5.) + x*y*z*z*z; });
-   return 0;
+   real h = (right - left) / n;
+   int i = 0;
+   for (real coord = left; coord < right; coord += h, i++)  axis[i] = coord;
+   if (i == 0) cout << "Error 1: Left coord > right coord";
 }
 
-int WriteRecMesh(real** recCoord, real left, real right, real step)
+// Создание приемников
+void CreateRec(string fileName, recInfo &rec)
 {
-    int n = (int)((right - left) / step);
-    real* temp = *recCoord = new real[n]{};
+   ifstream in(fileName);
 
-    for (int i = 0; i < n; i++) temp[i] = left + i * step;
+   real xL, xR, yL, yR, xH, yH;
 
-    return n;
+   in >> xL >> xR >> xH;
+   in >> yL >> yR >> yH;
+
+   rec.nRecX = (int)((xR - xL) / xH);
+   rec.nRecY = (yR - yL) == 0 ? 1 : (int)((yR - yL) / yH);
+
+   FillCoordAxis(&(rec.RecX), xL, xR, rec.nRecX);
+   FillCoordAxis(&(rec.RecY), yL, yR, rec.nRecY);
 }
 
-// Чтение координат приемников
-// Возвращает координаты по Х и по Y, а также количество координат по каждой из этих осей.
-void ReadRec(real** recX, real** recY, int& nRecX, int& nRecY)
+// Генерация матрицы и вектора правой части для решения МНК-функционала 
+void SLAEgen(meshInfo mesh, recInfo rec, real* g, Matrix& A, real** b, int& K )
 {
-    ifstream in("Params.txt");
-
-    real xL, xR, yL, yR, xH, yH;
-
-    in >> xL >> xR >> xH; // Вввод параметров (Левая граница оси, Правая граница оси, Шаг по оси)
-    in >> yL >> yR >> yH;
-
-    nRecX = WriteRecMesh(recX, xL, xR, xH);
-    nRecY = WriteRecMesh(recY, yL, yR, yH);
-}
-
-void SLAEgen(int nX, int nY, int nZ, int nRecX, int nRecY, real* X, real* Y, real* Z, real* RecX, real* RecY, real *G)
-{
-   int K = nX * nY * nZ;   // Количество ячеек
+   int nX = mesh.nX, nY = mesh.nY, nZ = mesh.nZ;
+   real* X = mesh.X, *Y = mesh.Y, *Z = mesh.Z;
    
-   Matrix A = new real * [K] {};   // Глобальная матрица СЛАУ
+   int nRecX = rec.nRecX, nRecY = rec.nRecY;
+   real* RecX = rec.RecX, *RecY = rec.RecY;
+
+   K = nX * nY * nZ;   // Количество ячеек
+
+   A = new real * [K] {};   // Глобальная матрица СЛАУ
    for (int i = 0; i < K; i++)
-      A[i] = new real[K]{};
-   
-   real* b = new real[K]{}; // Глобальная правая часть СЛАУ
+     A[i] = new real[K]{};
+
+   real* bb = *b = new real[K]{}; // Глобальная правая часть СЛАУ
 
    function<real(real, real, real, real*, int)> f = [](real xB, real yB, real zB, real* args, int argNum) // подынтегральная функция
    {
@@ -124,9 +163,10 @@ void SLAEgen(int nX, int nY, int nZ, int nRecX, int nRecY, real* X, real* Y, rea
    real RecCoords[3]{};
    real gq, gs;
    int iX, iY, iZ, jX, jY, jZ;
-   int nXY = nX * nY;
-   
-   for (int iRecX = 0; iRecX < nRecX; iRecX++)
+   int nXY = nX * nY, ir = 0;
+
+   // Заполнение вкладов ячеек в значения на приемниках
+   for (int iRecX = 0; iRecX < nRecX; iRecX++)  
    {
       RecCoords[0] = RecX[iRecX];
       for (int iRecY = 0; iRecY < nRecY; iRecY++)
@@ -146,55 +186,52 @@ void SLAEgen(int nX, int nY, int nZ, int nRecX, int nRecY, real* X, real* Y, rea
                gs = Integrate(X[jX], X[jX + 1], Y[jY], Y[jY + 1], Z[jZ], Z[jZ + 1], f, RecCoords, 3);
                A[q][s] += gq * gs;
             }
-
-            b[q] += gq * G[q];
+            bb[q] += gq * g[ir];
          }
+         ir++;
       }
    }
 
-   for (int q = 0; q < K; q++)
+   // Дозаполнение вкладов ячеек в значения на приемниках
+   for (int q = 0; q < K; q++) 
    {
-      b[q] /= 4 * M_PI;
-      for (int s = 0; s < K; s++)  A[q][s] /= 4 * M_PI * 4 * M_PI;
+      bb[q] /= 4. * M_PI;
+      for (int s = 0; s < K; s++) A[q][s] /= 4. * M_PI * 4. * M_PI;
+      //std::cout << A[q][q] << " ";
+      //cout << bb[q] << "\n";
    }
 
+
 }
 
-void ReadCoordAxis(real** coordAxis, real left, real right, int n)
+// Чтение координат сетки
+void CreateMesh(string fileName, meshInfo& mesh)
 {
-    real* axis = *coordAxis = new real[n]{};
-
-    real h = (left - right) / n;
-    int i = 0;
-    for (real coord = left; coord < right; coord += h, i++)  axis[i] = coord;
-    if (i == 0) cout << "Error 1: Left coord > right coord";
-}
-
-void ReadCoords(real**X, real** Y, real**Z, int& nX, int nY, int nZ)
-{
-   ifstream in("Mesh.txt");
+   ifstream in(fileName);
 
    real xL, xR, yL, yR, zL, zR;
-   in >> xL >> xR >> nX;
-   in >> yL >> yR >> nY;
-   in >> zL >> zR >> nZ;
+   in >> xL >> xR >> mesh.nX;
+   in >> yL >> yR >> mesh.nY;
+   in >> zL >> zR >> mesh.nZ;
 
-   ReadCoordAxis(X, xL, xR, nX);
-   ReadCoordAxis(Y, yL, yR, nY);
-   ReadCoordAxis(Z, zL, zR, nZ);
+   FillCoordAxis(&mesh.X, xL, xR, mesh.nX + 1);
+   FillCoordAxis(&mesh.Y, yL, yR, mesh.nY + 1);
+   FillCoordAxis(&mesh.Z, zL, zR, mesh.nZ + 1);
 }
 
-void SLAEsolve(double** M, int N, double* b, double* q)
+// Решение СЛАУ методом Гаусса без выбора ведущего элемента
+void SLAEsolve(Matrix M, int N, real* b, real** q)
 {
    //GAUSSE
-   double a;
-   
+   real* qq = *q = new real[N]{};
+   real a;	// Коэффициент Гаусса
+
    for (int i = 0; i < N; i++)
    {
       a = M[i][i];
       if (a)
       {
-          // Делим текущую строку на коэффициент
+         // Делим текущую строку на коэффициент
          for (int j = i; j < N; j++) M[i][j] /= a;
 
          b[i] /= a;
@@ -203,9 +240,9 @@ void SLAEsolve(double** M, int N, double* b, double* q)
          {
             a = M[iK][i];
 
-            for (int jK = i + 1; jK < N; jK++)  M[iK][jK] -= a * M[iK][jK];
+            for (int jK = i; jK < N; jK++)  M[iK][jK] -= a * M[i][jK];
 
-            b[iK] -= a * b[i];
+            b[iK] -= a * b[i]; 
          }
       }
       else
@@ -214,32 +251,85 @@ void SLAEsolve(double** M, int N, double* b, double* q)
 
    for (int i = N - 1; i > -1; i--)
    {
-      for (int j = N - 1; j > i; j--)  b[i] -= M[i][j] * q[j];
-      q[i] = b[i] / M[i][i];
+      for (int j = N - 1; j > i; j--)  b[i] -= M[i][j] * qq[j];
+      qq[i] = b[i] / M[i][i];
    }
 }
 
+// Численное интегрирование усложненным методом Гаусса
 real Integrate(real xL, real xR, real yL, real yR, real zL, real zR, function<real(real, real, real, real* args, int argNum)> f, real* args, int argNum)
 {
-   
-   const int nKnot = 5;
+   const int nKnot = 5; // Количество узлов Гаусса
 
-   real xj[nKnot] = { -sqrt(5. + 2. * (sqrt(10. / 7.))) / 3., -sqrt(5. - 2. * (sqrt(10. / 7.))) / 3.,
+   real xj[nKnot] = { -sqrt(5. + 2. * (sqrt(10. / 7.))) / 3., -sqrt(5. - 2. * (sqrt(10. / 7.))) / 3.,	// Значения координат на узлах
               0. , sqrt(5. - 2. * (sqrt(10. / 7.))) / 3. , sqrt(5. + 2. * (sqrt(10. / 7.))) / 3. };
-   real qj[nKnot] = { (322. - 13. * sqrt(70.)) / 900., (322. + 13. * sqrt(70.)) / 900., 128. / 225.,
+
+   real qj[nKnot] = { (322. - 13. * sqrt(70.)) / 900., (322. + 13. * sqrt(70.)) / 900., 128. / 225.,	// Веса узлов
                   (322. + 13. * sqrt(70.)) / 900., (322. - 13. * sqrt(70.)) / 900. };
+       // Шаги
    real hX = (xR - xL) / 2.,
-      hY = (yR - yL) / 2.,
-      hZ = (zR - zL) / 2.,
-      cX = (xR + xL) / 2.,
-      cY = (yR + yL) / 2.,
-      cZ = (zR + zL) / 2.;
+       hY = (yR - yL) / 2.,
+       hZ = (zR - zL) / 2., 
+       // Центры
+       cX = (xR + xL) / 2.,   
+       cY = (yR + yL) / 2.,   
+       cZ = (zR + zL) / 2.;   
 
    real result = 0.;
-   for (int i = 0; i < nKnot; i++)               // x
-      for (int j = 0; j < nKnot; j++)            // y 
-         for (int k = 0; k < nKnot; k++)         // z
-            result += qj[i] * qj[j] * qj[k] * (f(cX + xj[i] * hX, cY + xj[j] * hY, cZ + xj[k] * hZ, args, argNum));
+   for (int ix = 0; ix < nKnot; ix++)               
+      for (int iy = 0; iy < nKnot; iy++)           
+         for (int iz = 0; iz < nKnot; iz++)       
+            result += qj[ix] * qj[iy] * qj[iz] * (f(cX + xj[ix] * hX, cY + xj[iy] * hY, cZ + xj[iz] * hZ, args, argNum));
 
-   return (xR - xL) * (yR - yL) * (zR - zL) * result / 8.;
+   return (xR - xL) * (yR - yL) * (zR - zL) * result / 8.; // Масштабирование
+}  
+
+void WriteResult(string fileName, real* res, int nY, int nZ, int nX)
+{
+   
+   ofstream out(fileName);
+   out.precision(3);
+   //out.scientific;
+   int i, j , k, ind;
+   for(j = 0, ind = 0; j < nY; j++)
+   {
+        for(k = 0; k < nZ; k++)
+        {
+            for(i = 0; i < nX; i++, ind++)
+                out << res[ind] << " ";
+            out << endl;
+        }
+        out << endl;
+   }
+   /*
+   for (int i = 0; i < K; i++)
+   {
+      out << res[i] << "\n";
+   }
+   */
+}
+
+int main()
+{
+   meshInfo* mesh = new meshInfo;
+   CreateMesh("Mesh.txt", *mesh);
+
+   recInfo* rec =  new recInfo;
+   CreateRec("Params.txt", *rec);
+
+   //Syntetics(*mesh, *rec);
+
+   real* g; // вектор значений поля с приемников
+   readSyntetics("RecData.txt", &g);
+
+   Matrix A;
+   real *b;
+   int K;
+   SLAEgen(*mesh, *rec, g, A, &b, K);
+   
+   real* res;
+   SLAEsolve(A, K, b, &res);
+
+   WriteResult("SolutionF.txt", res, mesh->nX, mesh->nY, mesh->nZ);
+   return 0;
 }

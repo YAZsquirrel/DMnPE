@@ -26,13 +26,13 @@
     <Text Include="Params.txt">
       <Filter>Файлы ресурсов</Filter>
     </Text>
-    <Text Include="SolutionB.txt">
-      <Filter>Файлы ресурсов</Filter>
-    </Text>
     <Text Include="Mesh.txt">
       <Filter>Файлы ресурсов</Filter>
     </Text>
     <Text Include="RecData.txt">
+      <Filter>Файлы ресурсов</Filter>
+    </Text>
+    <Text Include="Body.txt">
       <Filter>Файлы ресурсов</Filter>
     </Text>
   </ItemGroup>
