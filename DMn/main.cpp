@@ -31,19 +31,18 @@ real ro(real x, real y, real z)
 }
 
 // каво-чиво
-int findIndCoord(real bodyCoord, real* X, int n)
+int findIndCoord(real bodyCoord, real* X, int n, bool right)
 {
    int i, iPrev = 0;
    int iR = n - 1, iL = 0;
 
-   for (i = iR; (X[i] > bodyCoord || X[i - 1] < bodyCoord) && i != iPrev; i = (iL + iR) / 2)
+   for (i = iR; (bodyCoord <= X[i - 1] || X[i] <= bodyCoord ) && i != iPrev; i = (iL + iR) / 2)
    {
       iPrev = i;
       (X[i] > bodyCoord ? iR : iL) = i;
    }
-   if (X[i - 1] == bodyCoord) i--;
 
-   return i;
+   return right ? i: --i;
 }
 
 // Ввод синтетических данных для тестирования программы
@@ -63,15 +62,18 @@ void Syntetics(meshInfo mesh, recInfo rec)
    out << nRecX * nRecY << endl;
    
    
-   auto G = [](real ro, real r, real coord, real mes) {return mes * ro / (4.0 * M_PI * r * r * r) * coord; };
+   auto G = [](real ro, real r, real coord, real mes) {return mes * ro / (4.0 * M_PI * pow(r, 3.)) * coord; };
 
-   int ixL = findIndCoord(xL, X, nX);
-   int ixR = findIndCoord(xR, X, nX) - 1;
-   int iyL = findIndCoord(yL, Y, nX);
-   int iyR = findIndCoord(yR, Y, nX) - 1;
-   int izL = findIndCoord(zL, Z, nX);
-   int izR = findIndCoord(zR, Z, nX) - 1;
-   
+   xL = 3, xR = 3.1, X = new real[3]{ 0, 2, 4 }, nX = 3;
+   int ixL = findIndCoord(xL, X, nX,0);
+   int ixR = findIndCoord(xR, X, nX,1);
+   int iyL = findIndCoord(yL, Y, nX,0);
+   int iyR = findIndCoord(yR, Y, nX,1);
+   int izL = findIndCoord(zL, Z, nX,0);
+   int izR = findIndCoord(zR, Z, nX,1);
+
+   if (ixL == ixR || iyL == iyR || izL == izR) exit(-100);
+
    real mes, rSqr[3]{}, sumG;
 
    for (int recI = 0; recI < nRecX; recI++)
@@ -81,13 +83,13 @@ void Syntetics(meshInfo mesh, recInfo rec)
          sumG = 0.;
          for (int ix = ixL; ix < ixR; ix++)
          {
-             rSqr[0] = (X[ix] - RecX[recI]) * (X[ix] - RecX[recI]);
+             rSqr[0] = pow(X[ix] - RecX[recI], 2.);
             for (int iy = iyL; iy < iyR; iy++)
             {
-                rSqr[1] = (Y[iy] - RecY[recJ]) * (Y[iy] - RecY[recJ]);
+                rSqr[1] = pow(Y[iy] - RecY[recJ], 2.);
                for (int iz = izL; iz < izR; iz++)
                {
-                  rSqr[2] = Z[iz] * Z[iz];
+                  rSqr[2] = pow(Z[iz], 2.);
                   mes =  (X[ix + 1] - X[ix])*(Y[iy + 1] - Y[iy])*(Z[iz + 1] - Z[iz]);
                   sumG += G(ro(X[ix], Y[iy], Z[iz]), sqrt(rSqr[0] + rSqr[1] + rSqr[2]), Z[iz], mes);
                }
@@ -280,7 +282,7 @@ real Integrate(real xL, real xR, real yL, real yR, real zL, real zR, function<re
       for (int iy = 0; iy < nKnot; iy++)           
          for (int iz = 0; iz < nKnot; iz++)       
             result += qj[ix] * qj[iy] * qj[iz] * (f(cX + xj[ix] * hX, cY + xj[iy] * hY, cZ + xj[iz] * hZ, args, argNum));
-
+   //cout << (xR - xL) * (yR - yL) * (zR - zL) * result / 8. << endl;
    return (xR - xL) * (yR - yL) * (zR - zL) * result / 8.; // Масштабирование
 }  
 
@@ -293,7 +295,7 @@ void WriteResult(string fileName, real* res, int nY, int nZ, int nX)
    int i, j , k, ind;
    for(j = 0, ind = 0; j < nY; j++)
    {
-        for(k = 0; k < nZ; k++)
+        for(k = nZ - 1; k > -1; k--)
         {
             for(i = 0; i < nX; i++, ind++)
                 out << res[ind] << " ";
@@ -313,23 +315,25 @@ int main()
 {
    meshInfo* mesh = new meshInfo;
    CreateMesh("Mesh.txt", *mesh);
-
+   
    recInfo* rec =  new recInfo;
    CreateRec("Params.txt", *rec);
-
-   //Syntetics(*mesh, *rec);
-
+   
+   Syntetics(*mesh, *rec);
+   
    real* g; // вектор значений поля с приемников
    readSyntetics("RecData.txt", &g);
-
+   
    Matrix A;
    real *b;
    int K;
+
    SLAEgen(*mesh, *rec, g, A, &b, K);
-   
+
    real* res;
    SLAEsolve(A, K, b, &res);
 
    WriteResult("SolutionF.txt", res, mesh->nX, mesh->nY, mesh->nZ);
+
    return 0;
 }
