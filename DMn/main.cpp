@@ -24,9 +24,24 @@ void BodyInput(real& xL, real& xR, real& yL, real& yR, real& zL, real& zR)
    in.close();
 }
 
-// лол
+// Известная плотность
 real ro(real x, real y, real z)
 {
+   if (x < 0)
+   {
+      if(z<-150)
+          return 1.;
+      else
+          return 2.;
+   }
+   else
+   {
+       if(z<-150)
+          return 2.;
+       else 
+          return 1.;
+   }
+   
    return 1;
 }
 
@@ -36,13 +51,13 @@ int findIndCoord(real bodyCoord, real* X, int n, bool right)
    int i, iPrev = 0;
    int iR = n - 1, iL = 0;
 
-   for (i = iR; (bodyCoord <= X[i - 1] || X[i] <= bodyCoord ) && i != iPrev; i = (iL + iR) / 2)
+   for (i = iR; (bodyCoord <= X[i] || X[i+1] <= bodyCoord ) && i != iPrev; i = (iL + iR) / 2)
    {
       iPrev = i;
       (X[i] > bodyCoord ? iR : iL) = i;
    }
 
-   return right ? i: --i;
+   return right ? i+1: i;
 }
 
 // Ввод синтетических данных для тестирования программы
@@ -62,19 +77,24 @@ void Syntetics(meshInfo mesh, recInfo rec)
    out << nRecX * nRecY << endl;
    
    
-   auto G = [](real ro, real r, real coord, real mes) {return mes * ro / (4.0 * M_PI * pow(r, 3.)) * coord; };
+   //auto dg = [](real ro, real r, real coord, real mes) {return mes * ro / (4.0 * M_PI * pow(r, 3.)) * coord; };
 
-   xL = 3, xR = 3.1, X = new real[3]{ 0, 2, 4 }, nX = 3;
+   function<real(real, real, real, real*, int)> dg = [](real xB, real yB, real zB, real* args, int argNum) // подынтегральная функция
+   {
+      real r = sqrt(pow(args[0] - xB, 2) + pow(args[1] - yB, 2) + pow(args[2] - zB, 2));   // Подсчет нормы вектора
+      return zB / pow(r, 3);
+   };
+
+   //xL = 3, xR = 3.1, X = new real[3]{ 0, 2, 4 }, nX = 3;
    int ixL = findIndCoord(xL, X, nX,0);
    int ixR = findIndCoord(xR, X, nX,1);
-   int iyL = findIndCoord(yL, Y, nX,0);
-   int iyR = findIndCoord(yR, Y, nX,1);
-   int izL = findIndCoord(zL, Z, nX,0);
-   int izR = findIndCoord(zR, Z, nX,1);
+   int iyL = findIndCoord(yL, Y, nY,0);
+   int iyR = findIndCoord(yR, Y, nY,1);
+   int izL = findIndCoord(zL, Z, nZ,0);
+   int izR = findIndCoord(zR, Z, nZ,1);
 
-   if (ixL == ixR || iyL == iyR || izL == izR) exit(-100);
 
-   real mes, rSqr[3]{}, sumG;
+   real rSqr[3]{}, sumG;
 
    for (int recI = 0; recI < nRecX; recI++)
    { 
@@ -83,15 +103,15 @@ void Syntetics(meshInfo mesh, recInfo rec)
          sumG = 0.;
          for (int ix = ixL; ix < ixR; ix++)
          {
-             rSqr[0] = pow(X[ix] - RecX[recI], 2.);
+             //rSqr[0] = pow(X[ix] - RecX[recI], 2.);
             for (int iy = iyL; iy < iyR; iy++)
             {
-                rSqr[1] = pow(Y[iy] - RecY[recJ], 2.);
+                //rSqr[1] = pow(Y[iy] - RecY[recJ], 2.);
                for (int iz = izL; iz < izR; iz++)
                {
-                  rSqr[2] = pow(Z[iz], 2.);
-                  mes =  (X[ix + 1] - X[ix])*(Y[iy + 1] - Y[iy])*(Z[iz + 1] - Z[iz]);
-                  sumG += G(ro(X[ix], Y[iy], Z[iz]), sqrt(rSqr[0] + rSqr[1] + rSqr[2]), Z[iz], mes);
+                  //rSqr[2] = pow(Z[iz], 2.);
+                  sumG += ro((X[ix + 1]+X[ix])/2, (Y[iy + 1]+Y[iy])/2, (Z[iz + 1]+Z[iz])/2) *
+                  Integrate(X[ix], X[ix + 1], Y[iy], Y[iy + 1], Z[iz], Z[iz + 1], dg, new real[3]{ RecX[recI], RecY[recJ], 0.}, 3) / M_PI / 4.;
                }
             }
          }
@@ -116,7 +136,7 @@ void FillCoordAxis(real** coordAxis, real left, real right, int n)
 {
    real* axis = *coordAxis = new real[n]{};
 
-   real h = (right - left) / n;
+   real h = (right - left) / (n - 1);
    int i = 0;
    for (real coord = left; coord < right; coord += h, i++)  axis[i] = coord;
    if (i == 0) cout << "Error 1: Left coord > right coord";
@@ -286,7 +306,7 @@ real Integrate(real xL, real xR, real yL, real yR, real zL, real zR, function<re
    return (xR - xL) * (yR - yL) * (zR - zL) * result / 8.; // Масштабирование
 }  
 
-void WriteResult(string fileName, real* res, int nY, int nZ, int nX)
+void WriteResult(string fileName, real* res, int nX, int nY, int nZ)
 {
    
    ofstream out(fileName);
@@ -311,6 +331,19 @@ void WriteResult(string fileName, real* res, int nY, int nZ, int nX)
    */
 }
 
+void Regularize(Matrix M, int N, real alpha, real* gamma)
+{
+   int m = 5; // (i - m) <- i -> (i + m) ?
+   for (int i = 0; i < N; i++)
+   {
+      for (int j = 0; j < N; j++)
+      {
+         M[i][j] += (i != 0 ? -(gamma[i] + gamma[j]) : alpha + 4 * gamma[i] + (gamma[i - 1] + gamma[i + 1] + gamma[i + m] + gamma[i - m]));
+      }
+   }
+   
+}
+
 int main()
 {
    meshInfo* mesh = new meshInfo;
@@ -329,6 +362,7 @@ int main()
    int K;
 
    SLAEgen(*mesh, *rec, g, A, &b, K);
+   Regularize(A, K, 1e-8, new real[K]{});
 
    real* res;
    SLAEsolve(A, K, b, &res);
