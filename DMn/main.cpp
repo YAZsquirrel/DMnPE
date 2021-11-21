@@ -24,28 +24,33 @@ void BodyInput(real& xL, real& xR, real& yL, real& yR, real& zL, real& zR)
    in.close();
 }
 
+int sign(real x)
+{
+   return x < 0 ? -1 : 1;
+}
+
 // Известная плотность
 real ro(real x, real y, real z)
 {
-   if (x < 0 && x > -100)
+   if (0 < sign(x) * (int)x % 200 && sign(x) * (int)x % 200 < 100)
    {
-      if (z<-150 && z > -200)
+      if (0 < sign(z) * (int)z % 100 && sign(z) * (int)z % 100 < 50)
          return 1.;
-      else if (z > -150 && z < -100)
-         return 2.;
+      else 
+         return 0.;
    }
-   else if (x < 100 && x > 0)
+   else
    {
-      if (z<-150 && z > -200)
-         return 2.;
-      else if (z > -150 && z < -100)
+      if (0 < sign(z) * (int)z % 100 && sign(z) * (int)z % 100 < 50)
+         return 0.;
+      else
          return 1.;
    }
 
    return 0;
 }
 
-// каво-чиво
+// Вычисление номера координаты/узла на оси
 int findIndCoord(real bodyCoord, real* X, int n, bool right)
 {
    int i, iPrev = 0;
@@ -61,7 +66,6 @@ int findIndCoord(real bodyCoord, real* X, int n, bool right)
 }
 
 // Ввод синтетических данных для тестирования программы
-
 void Syntetics(meshInfo mesh, recInfo rec)
 {
    real* RecX = rec.RecX, * RecY = rec.RecY;
@@ -119,6 +123,7 @@ void Syntetics(meshInfo mesh, recInfo rec)
    }
 }
 
+// Чтение данных с приемников
 void readRecieverData(string fileName, real** G)
 {
    ifstream in(fileName);
@@ -303,6 +308,7 @@ real Integrate(real xL, real xR, real yL, real yR, real zL, real zR, function<re
    return (xR - xL) * (yR - yL) * (zR - zL) * result / 8.; // Масштабирование
 }
 
+// Вывод
 void WriteResult(string fileName, real* res, int nX, int nY, int nZ)
 {
 
@@ -322,6 +328,7 @@ void WriteResult(string fileName, real* res, int nX, int nY, int nZ)
    }
 }
 
+// Добавление регуляризирующих добавок
 void Regularize(Matrix M, int N, real alpha, real* gamma, meshInfo* mesh)
 {
    int shiftY = mesh->nX, shiftZ = mesh->nY * mesh->nZ;
@@ -342,6 +349,7 @@ void Regularize(Matrix M, int N, real alpha, real* gamma, meshInfo* mesh)
 
 }
 
+// Подсчет суммы квадратов ошибки
 real countSqErr(meshInfo* mesh, recInfo* rec, real* p, real* g)
 {
    real* RecX = rec->RecX, * RecY = rec->RecY;
@@ -381,6 +389,7 @@ real countSqErr(meshInfo* mesh, recInfo* rec, real* p, real* g)
    return err;
 }
 
+// Подсчет значения функционала
 real countMinimizeFunct(real* g, real* gamma, real alpha, real* p, int N, meshInfo* mesh, recInfo* rec) // расчёт минимизируемого функционала
 {
    real minimizeFunct = countSqErr(mesh, rec, p, g);
@@ -411,8 +420,7 @@ real countMinimizeFunct(real* g, real* gamma, real alpha, real* p, int N, meshIn
    return minimizeFunct;
 }
 
-
-
+// Копирование матрицы A и вектора b для подбора gamma
 void copyMatrixAndB(Matrix M, Matrix M_copy, real* b, real* b_copy, int N)
 {
    for (int i = 0; i < N; i++)
@@ -423,8 +431,10 @@ void copyMatrixAndB(Matrix M, Matrix M_copy, real* b, real* b_copy, int N)
    }
 }
 
+// подбор gamma
 void AdjustGamma(Matrix M, int N, real* b, real* g, real alpha, meshInfo* mesh, recInfo* rec, real** res, real gamma0) // подбор гаммы
 {
+
    int nX = mesh->nX, nY = mesh->nY, nZ = mesh->nZ;
    int shiftY = nX, shiftZ = nY * nZ;
    real* gamma = new real[N]{};
@@ -437,13 +447,19 @@ void AdjustGamma(Matrix M, int N, real* b, real* g, real alpha, meshInfo* mesh, 
       M_copy[i] = new real[N];
    real* b_copy = new real[N];
     
+   if (gamma0 == 0.0 && alpha == 0.0)
+   {
+      copyMatrixAndB(M, M_copy, b, b_copy, N);
+      SLAEsolve(M_copy, N, b_copy, ro_s);
+      return;
+   }
    copyMatrixAndB(M, M_copy, b, b_copy, N);
 
    Regularize(M_copy, N, alpha, gamma, mesh);
    SLAEsolve(M_copy, N, b_copy, ro_s);
 
    real currMinimizeFunct = countMinimizeFunct(g, gamma, alpha, ro_s, N, mesh, rec);
-   real upBordMinimizeFunct = 2 * currMinimizeFunct;
+   real upBordMinimizeFunct = 3 * currMinimizeFunct;
    real difClose;
    int iter = 0;
    bool gammaNotChange = true;
@@ -541,7 +557,7 @@ void AdjustGamma(Matrix M, int N, real* b, real* g, real alpha, meshInfo* mesh, 
       Regularize(M_copy, N, alpha, gamma, mesh);
       SLAEsolve(M_copy, N, b_copy, ro_s);
       currMinimizeFunct = countMinimizeFunct(g, gamma, alpha, ro_s, N, mesh, rec);
-      iter++;
+      cout << iter++ << '\n';
    }
    cout << iter;
 }
