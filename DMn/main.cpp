@@ -443,9 +443,12 @@ void AdjustGamma(Matrix M, int N, real* b, real* g, real alpha, meshInfo* mesh, 
    SLAEsolve(M_copy, N, b_copy, ro_s);
 
    real currMinimizeFunct = countMinimizeFunct(g, gamma, alpha, ro_s, N, mesh, rec);
-   real upBordMinimizeFunct = 1.3 * currMinimizeFunct;
+   real upBordMinimizeFunct = 2 * currMinimizeFunct;
    real difClose;
    int iter = 0;
+   bool gammaNotChange = true;
+   real gammaIncrease = 2;
+   real acceptErr = 0.5;
    while (currMinimizeFunct < upBordMinimizeFunct)
    {
 
@@ -453,26 +456,89 @@ void AdjustGamma(Matrix M, int N, real* b, real* g, real alpha, meshInfo* mesh, 
       {
          for (int iy = 0; iy < nY; iy++)
          {
-            for (int ix = 0; ix < nX; ix++, k++)
+            for (int ix = 0, m = 0; ix < nX; ix++, k++)
             {
                difClose = 0;
-               if (0 < k % mesh->nX)  difClose += pow(ro_s[k] - ro_s[k - 1], 2);
-               if (nX > k % mesh->nX) difClose += pow(ro_s[k] - ro_s[k + 1], 2);
+               if (0 < k % mesh->nX)  
+               {
+                     if (ro_s[k] / ro_s[k - 1] > acceptErr)
+                     {
+                        gamma[k] *= gammaIncrease;
+                        gamma[k - 1] *= gammaIncrease;
+                        gammaNotChange = false;
+                     }               
+               }
+               if (nX > k % mesh->nX)
+               {
+                  if (ro_s[k] / ro_s[k + 1] > acceptErr)
+                  {
+                     if(gammaNotChange)
+                     {
+                        gamma[k] *= gammaIncrease;
+                        gammaNotChange = false;
+                     }
+                     gamma[k + 1] *= gammaIncrease;                     
+                  }
+               }
+               //{difClose += pow(ro_s[k] - ro_s[k + 1], 2); m++;}
 
-               if (0 < (int)(k / shiftY))  difClose += pow(ro_s[k] - ro_s[k - shiftY], 2);
-               if (nY > (int)(k / shiftY)) difClose += pow(ro_s[k] - ro_s[k + shiftY], 2);
+               if (0 < (int)(k / shiftY))//  {difClose += pow(ro_s[k] - ro_s[k - shiftY], 2); m++;}
+               {
+                  if (ro_s[k] / ro_s[k - shiftY] > acceptErr)
+                  {
+                     if (gammaNotChange)
+                     {
+                        gamma[k] *= gammaIncrease;
+                        gammaNotChange = false;
+                     }
+                     gamma[k - shiftY] *= gammaIncrease;
+                  }
+               }
+               if (nY > (int)(k / shiftY))// {difClose += pow(ro_s[k] - ro_s[k + shiftY], 2); m++; }
+               {
+                     if (ro_s[k] / ro_s[k + shiftY] > acceptErr)
+                     {
+                        if (gammaNotChange)
+                        {
+                           gamma[k] *= gammaIncrease;
+                           gammaNotChange = false;
+                        }
+                        gamma[k + shiftY] *= gammaIncrease;
+                     }
+               }
 
-               if (0 < (int)(k / shiftZ))  difClose += pow(ro_s[k] - ro_s[k - shiftZ], 2);
-               if (nZ > (int)(k / shiftZ)) difClose += pow(ro_s[k] - ro_s[k + shiftZ], 2);
-
-               if (difClose / (6 * pow(ro_s[k], 2)) > 0.5)
-                  gamma[k] *= 2;
+               if (0 < (int)(k / shiftZ))//  {difClose += pow(ro_s[k] - ro_s[k - shiftZ], 2); m++;}
+               {
+                  if (ro_s[k] / ro_s[k - shiftZ] > acceptErr)
+                  {
+                     if (gammaNotChange)
+                     {
+                        gamma[k] *= gammaIncrease;
+                        gammaNotChange = false;
+                     }
+                     gamma[k - shiftZ] *= gammaIncrease;
+                  }
+               }
+               if (nZ > (int)(k / shiftZ))// {difClose += pow(ro_s[k] - ro_s[k + shiftZ], 2); m++;}
+               {
+                  if (ro_s[k] / ro_s[k + shiftZ] > acceptErr)
+                  {
+                     if (gammaNotChange)
+                     {
+                        gamma[k] *= gammaIncrease;
+                        gammaNotChange = false;
+                     }
+                     gamma[k + shiftZ] *= gammaIncrease;
+                  }
+               }
+               //if (difClose / (m * pow(ro_s[k], 2)) > 0.5)
+               //   gamma[k] *= gammaIncrease;
             }
          }
       }
       copyMatrixAndB(M, M_copy, b, b_copy, N);
 
-      Regularize(M_copy, N, 1e-8, gamma, mesh);
+      Regularize(M_copy, N, alpha, gamma, mesh);
       SLAEsolve(M_copy, N, b_copy, ro_s);
       currMinimizeFunct = countMinimizeFunct(g, gamma, alpha, ro_s, N, mesh, rec);
       iter++;
@@ -500,7 +566,7 @@ int main()
    SLAEgen(*mesh, *rec, g, A, &b, K);
 
    real* res;
-   AdjustGamma(A, K, b, g, 1e-8, mesh, rec, &res, 1e-10);
+   AdjustGamma(A, K, b, g, 1e-8, mesh, rec, &res, 1e-8);
 
    WriteResult("SolutionF.txt", res, mesh->nX, mesh->nY, mesh->nZ);
 
