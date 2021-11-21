@@ -1,6 +1,4 @@
 #include "main.h"
-#define OPTIM_SYNTETIC
-typedef real** Matrix;
 
 struct recInfo	 // Структура данных приемников
 {
@@ -582,7 +580,7 @@ int main()
    SLAEgen(*mesh, *rec, g, A, &b, K);
 
    real* res;
-   AdjustGamma(A, K, b, g, 1e-8, mesh, rec, &res, 1e-8);
+   AdjustGamma(A, K, b, g, 1e-8, mesh, rec, &res, 0);
 
    WriteResult("SolutionF.txt", res, mesh->nX, mesh->nY, mesh->nZ);
 

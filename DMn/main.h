@@ -7,6 +7,5 @@
 
 using namespace std;
 typedef double real;
+typedef real** Matrix;
 
-real Integrate(real xL, real xR, real yL, real yR, real zL, real zR, function<real(real, real, real, real* args, int argNum)> f, real* args, int argNum);
-//void ReadRec(real* RecX, real* RecY, int& nRecX, int& nRecY);
